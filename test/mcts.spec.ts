@@ -5,6 +5,7 @@ import { DeepPartial } from "../src/utils/types"
 const defaultStrategy = {
   availableMoves: () => [],
   calcUcb: () => 0,
+  calcValue: () => 0,
   getNextMove: () => ({}),
   isFinal: () => true,
   nextState: (state: any) => state,
@@ -34,8 +35,8 @@ describe("mcts", () => {
       children: [
         {
           children: [],
-          childrenMoves: [],
           index: 1,
+          move: move1,
           parentIndex: 0,
           state: state1,
           value: 0,
@@ -43,16 +44,16 @@ describe("mcts", () => {
         },
         {
           children: [],
-          childrenMoves: [],
           index: 2,
+          move: move2,
           parentIndex: 0,
           state: state2,
           value: 0,
           visits: 0,
         },
       ],
-      childrenMoves: [move1, move2],
       index: 0,
+      move: undefined,
       parentIndex: MCTS.NO_PARENT,
       state: initialState,
       value: 0,
@@ -73,10 +74,7 @@ describe("mcts", () => {
 
     const strategy = getStrategy({
       availableMoves: () => [otherMove, bestMove],
-      calcUcb: jest
-        .fn()
-        .mockImplementationOnce(() => 10)
-        .mockImplementationOnce(() => 20),
+      calcUcb: jest.fn(node => (node.move === bestMove ? 20 : 10)),
       isFinal: () => true,
     })
 
@@ -87,35 +85,42 @@ describe("mcts", () => {
     expect(bestMoveFound).toBe(bestMove)
   })
 
-  it.skip("rollsout the best move available", () => {
-    const bestMove = { some: "bestMove" } as any
-    const otherMove = { some: "otherMove" } as any
-    const rolloutMove = { some: "rolloutMove" } as any
+  it("rollsOut the best move available", () => {
+    type Indexed = { [k: string]: any }
+
+    const getStateInfo = (info: any) => stateInfo[info.id]!
+
+    const createStateInfo = (id: string, ucb: number, nextMove: string = ""): Indexed => ({
+      [id]: {
+        move: { id },
+        nextMove,
+        nextState: { id },
+        ucb,
+      },
+    })
+
     const initialState = { some: "state" } as any
-    const bestMoveState = { some: "bestMoveState" } as any
-    const otherMoveState = { some: "otherMoveState" } as any
-    const rolloutMoveState = { some: "rolloutMoveState" } as any
+    const stateInfo = {
+      ...createStateInfo("best", 20, "rolloutFromBest"),
+      ...createStateInfo("other", 10, "rolloutFromOther"),
+      ...createStateInfo("rolloutFromBest", 15),
+      ...createStateInfo("rolloutFromOther", 3),
+    }
 
     const strategy = getStrategy({
-      availableMoves: jest
-        .fn()
-        .mockImplementationOnce(() => [otherMove, bestMove])
-        .mockImplementation(() => [rolloutMove]),
-      calcUcb: jest.fn(node => (node.state === bestMoveState ? 20 : 10)),
-      getNextMove: jest.fn(() => rolloutMoveState),
-      isFinal: jest.fn(state => state === rolloutMoveState),
-      nextState: jest
-        .fn((_, move) => (move === bestMove ? bestMoveState : otherMoveState))
-        .mockImplementationOnce(() => otherMoveState)
-        .mockImplementationOnce(() => bestMoveState),
+      availableMoves: () => [stateInfo.best.move, stateInfo.other.move],
+      calcUcb: node => getStateInfo(node.move).ucb,
+      getNextMove: jest.fn(state => stateInfo[getStateInfo(state).nextMove].move),
+      isFinal: state => state === stateInfo.rolloutFromBest.nextState,
+      nextState: (_, move) => getStateInfo(move).nextState,
     })
 
     const tree = MCTS.createTree(strategy)(initialState)
 
     const bestMoveFound = MCTS.findBestMove(strategy)(tree.nodes[0])
 
-    expect(strategy.getNextMove).toHaveBeenCalledWith(bestMoveState)
+    expect(strategy.getNextMove).toHaveBeenCalledWith(stateInfo.best.nextState)
 
-    expect(bestMoveFound).toBe(bestMove)
+    expect(bestMoveFound).toBe(stateInfo.best.move)
   })
 })

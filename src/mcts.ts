@@ -14,24 +14,30 @@ interface Node {
   state: State
   parentIndex: number
   children: ReadonlyArray<Node>
-  childrenMoves: ReadonlyArray<Move>
   index: number
+  move?: Move
   value: number
   visits: number
 }
 
 export interface Strategy {
   availableMoves: (state: State) => Move[]
-  getNextMove: (state: State) => Move
-  nextState: (state: State, move: Move) => State
-  isFinal: (state: State) => boolean
   calcUcb: (node: Node) => number
+  calcValue: (state: State) => number
+  getNextMove: (state: State) => Move
+  isFinal: (state: State) => boolean
+  nextState: (state: State, move: Move) => State
 }
 
-const createNode = (state: State, index: number, parentIndex: number = NO_PARENT) => ({
+const createNode = (
+  state: State,
+  index: number,
+  parentIndex: number = NO_PARENT,
+  move: Move | undefined = undefined,
+) => ({
   children: [],
-  childrenMoves: [],
   index,
+  move,
   parentIndex,
   state,
   value: 0,
@@ -41,18 +47,30 @@ const createNode = (state: State, index: number, parentIndex: number = NO_PARENT
 export const createTree = (strategy: Strategy) => (initialState: State) => {
   const node = createNode(initialState, 0)
   const childrenMoves = strategy.availableMoves(initialState)
-  const children = childrenMoves.map((move, i) => createNode(strategy.nextState(initialState, move), i + 1, 0))
+  const children = childrenMoves.map((move, i) => createNode(strategy.nextState(initialState, move), i + 1, 0, move))
   const root = {
     ...node,
     children,
-    childrenMoves,
   }
   return { nodes: [root] }
+}
+
+const rollOut = (strategy: Strategy) => (state: State): number => {
+  return strategy.isFinal(state)
+    ? strategy.calcValue(state)
+    : rollOut(strategy)(strategy.nextState(state, strategy.getNextMove(state)))
 }
 
 export const findBestMove = (strategy: Strategy) => (node: Node) => {
   const ucbs = node.children.map(c => strategy.calcUcb(c))
   const bestUcb = R.reduce(R.max, -Infinity, ucbs)
   const bestNodeIndex = ucbs.findIndex(v => v === bestUcb)
-  return node.childrenMoves[bestNodeIndex]
+  const bestNode = node.children[bestNodeIndex]
+
+  if (strategy.isFinal(bestNode.state)) {
+    return bestNode.move
+  }
+
+  rollOut(strategy)(bestNode.state)
+  return bestNode.move
 }
