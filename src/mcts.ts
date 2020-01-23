@@ -58,16 +58,11 @@ const parentVisits = (tree: Tree) => (node: Node) => {
   return Math.max(parent ? parent.visits : 1, 1)
 }
 
-export const p = (...a: any) => {
-  a.forEach((v: any) => console.log("=====>\n", JSON.stringify(v, null, 2)))
-  return a[a.length - 1]
-}
-
 const sqrt2 = Math.sqrt(2)
-export const calcUcb = (tree: Tree) => (node: Node) =>
+export const defaultCalcUcb = (c: number = sqrt2) => (tree: Tree) => (node: Node) =>
   node.visits === 0
     ? Infinity
-    : node.value / node.visits + sqrt2 * Math.sqrt(Math.log(parentVisits(tree)(node)) / node.visits)
+    : node.value / node.visits + c * Math.sqrt(Math.log(parentVisits(tree)(node)) / node.visits)
 
 const addChildNodes = (tree: Tree, node: Node) => {
   const {
@@ -155,14 +150,6 @@ const rollout = (tree: Tree) => (state: State): TreeResult => ({
   value: rolloutValue(tree)(state),
 })
 
-// const backPropagate = (tree: Tree) => (value: number, node?: Node): Tree =>
-//   node
-//     ? backPropagate(replaceNode(tree)({ ...node, value: node.value + value, visits: node.visits + 1 }))(
-//         value,
-//         getParent(tree)(node),
-//       )
-//     : tree
-
 const visit = (tree: Tree, node: Node): TreeResult => {
   const { config: { strategy} } = tree
 
@@ -182,8 +169,6 @@ const visit = (tree: Tree, node: Node): TreeResult => {
     value: n.value + newTreeResult.value,
     visits: n.visits + 1,
   }))
-
-  // console.log("UPDATED TREE=====>\n", JSON.stringify(updatedTree, null, 2))
 
   return {
     tree: updatedTree,
