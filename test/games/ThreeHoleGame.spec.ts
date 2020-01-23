@@ -13,22 +13,22 @@ describe("ThreeHoleGame", () => {
 
     expect(ThreeHoleGame.availableMoves(game)).toEqual([
       {
-        player: "X",
+        piece: "X",
         position: 0,
       },
       {
-        player: "X",
+        piece: "X",
         position: 1,
       },
       {
-        player: "X",
+        piece: "X",
         position: 2,
       },
     ])
   })
 
   describe("move", () => {
-    it("first player", () => {
+    it("first move", () => {
       const game = ThreeHoleGame.move(ThreeHoleGame.create(), { piece: "X", position: 2 })
 
       expect(game).toEqual({
@@ -37,7 +37,7 @@ describe("ThreeHoleGame", () => {
       })
     })
 
-    it("second player", () => {
+    it("second move", () => {
       const game = ThreeHoleGame.move(ThreeHoleGame.move(ThreeHoleGame.create(), { piece: "X", position: 2 }), {
         piece: "O",
         position: 0,
@@ -45,6 +45,24 @@ describe("ThreeHoleGame", () => {
 
       expect(game).toEqual({
         holes: ["O", ".", "X"],
+        player: "X",
+      })
+    })
+
+    it("third move", () => {
+      const game = ThreeHoleGame.move(
+        ThreeHoleGame.move(ThreeHoleGame.move(ThreeHoleGame.create(), { piece: "X", position: 2 }), {
+          piece: "O",
+          position: 0,
+        }),
+        {
+          piece: "X",
+          position: 1,
+        },
+      )
+
+      expect(game).toEqual({
+        holes: ["O", "X", "X"],
         player: "X",
       })
     })
@@ -65,7 +83,7 @@ describe("ThreeHoleGame", () => {
   describe("nextMove", () => {
     it("returns first move", () => {
       expect(ThreeHoleGame.nextMove(ThreeHoleGame.create())).toEqual({
-        player: "X",
+        piece: "X",
         position: 0,
       })
     })

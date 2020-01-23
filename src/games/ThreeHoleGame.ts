@@ -1,38 +1,43 @@
-import * as R from "ramda"
-
 type Player = "X" | "O"
 type Piece = "X" | "O" | "."
 
-interface Move {
+export interface Move {
   position: number
   piece: Piece
 }
 
-interface GameState {
+export interface GameState {
   holes: Piece[]
   player: Player
 }
 
-const otherPlayer = (player: Player): Player => (player === "X" ? "O" : "X")
+export const otherPlayer = (player: Player): Player => (player === "X" ? "O" : "X")
 
 export const create = (): GameState => ({
   holes: [".", ".", "."],
   player: "X",
 })
 
-export const availableMoves = (state: GameState) =>
+export const availableMoves = (state: GameState): Move[] =>
   state.holes
     .map((h, i) => (h === "." ? i : undefined))
     .filter(i => i != undefined)
     .map(i => ({
-      player: state.player,
-      position: i,
+      piece: state.player as Piece,
+      position: i!,
     }))
 
-export const move = (state: GameState, { piece, position }: Move) => ({
-  holes: state.holes.map((h, i) => (i === position ? piece : h)),
-  player: otherPlayer(state.player),
-})
+export const move = (state: GameState, { piece, position }: Move) => {
+  const holes = state.holes.map((h, i) => (i === position ? piece : h))
+  const newState = {
+    ...state,
+    holes,
+  }
+  return {
+    ...newState,
+    player: isFinal(newState) ?  newState.player : otherPlayer(newState.player),
+  }
+}
 
 export const nextMove = (state: GameState) => {
   const moves = availableMoves(state)
@@ -40,6 +45,3 @@ export const nextMove = (state: GameState) => {
 }
 
 export const isFinal = (state: GameState) => state.holes[1] !== "."
-
-export const calcValue = (state: GameState) =>
-  state.holes[1] === state.player ? 1 : state.holes[1] === otherPlayer(state.player) ? -1 : undefined
