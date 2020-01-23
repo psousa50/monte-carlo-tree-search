@@ -25,22 +25,7 @@ describe("mcts", () => {
   it("creates an mcts tree", () => {
     const game = ThreeHoleGame.create()
 
-    const tree = MCTS.createTree(game)
-
-    // const expectedStates = [
-    //   {
-    //     holes: ["X", ".", "."],
-    //     player: "O",
-    //   },
-    //   {
-    //     holes: [".", "X", "."],
-    //     player: "X",
-    //   },
-    //   {
-    //     holes: [".", ".", "X"],
-    //     player: "O",
-    //   },
-    // ]
+    const tree = MCTS.createTree(config)(game)
 
     const root = ({
       children: [],
@@ -51,6 +36,7 @@ describe("mcts", () => {
       visits: 0,
     })
     const expectedTree = ({
+      config,
       nodes: [root],
     })
 
@@ -59,7 +45,7 @@ describe("mcts", () => {
 
   it("runs first level rollout", () => {
     const game = ThreeHoleGame.create()
-    const { tree } = MCTS.findBestNode(config)(MCTS.createTree(game), 3)
+    const { tree } = MCTS.findBestNode(MCTS.createTree(config)(game), 3)
     const rootNodes = MCTS.getChildren(tree)(MCTS.getRoot(tree))
 
     expect(rootNodes.map(n => n.value)).toEqual([-1, 1, 1])
@@ -67,7 +53,7 @@ describe("mcts", () => {
 
   it("runs second level rollout", () => {
     const game = ThreeHoleGame.create()
-    const { tree } = MCTS.findBestNode(config)(MCTS.createTree(game), 4)
+    const { tree } = MCTS.findBestNode(MCTS.createTree(config)(game), 4)
     const rootNodes = MCTS.getChildren(tree)(MCTS.getRoot(tree))
 
     expect(rootNodes.map(n => n.value)).toEqual([-2, 1, 1])
@@ -75,7 +61,7 @@ describe("mcts", () => {
 
   it("long simulation return best move which is play at the middle hole", () => {
     const game = ThreeHoleGame.create()
-    const { node } = MCTS.findBestNode(config)(MCTS.createTree(game), 50)
+    const { node } = MCTS.findBestNode(MCTS.createTree(config)(game), 50)
 
     expect(node.index).toEqual(2)
   })

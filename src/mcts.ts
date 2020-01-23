@@ -5,7 +5,8 @@ export const NO_PARENT = -1
 type State = any
 type Move = any
 
-export interface Tree {
+export interface Tree<S = State, M = Move> {
+  config: Config<S, M>
   nodes: ReadonlyArray<Node>
 }
 
@@ -68,11 +69,15 @@ export const calcUcb = (tree: Tree) => (node: Node) =>
     ? Infinity
     : node.value / node.visits + sqrt2 * Math.sqrt(Math.log(parentVisits(tree)(node)) / node.visits)
 
-const addChildNodes = (config: Config) => (tree: Tree, node: Node) => {
-  const nodeIndex = tree.nodes.length
-  const childrenMoves = config.strategy.availableMoves(node.state)
+const addChildNodes = (tree: Tree, node: Node) => {
+  const {
+    nodes,
+    config: { strategy },
+  } = tree
+  const nodeIndex = nodes.length
+  const childrenMoves = strategy.availableMoves(node.state)
   const children = childrenMoves.map((move, i) =>
-    createNode(config.strategy.nextState(node.state, move), nodeIndex + i, node.index, move),
+    createNode(strategy.nextState(node.state, move), nodeIndex + i, node.index, move),
   )
 
   const nodeWithChildren = {
@@ -104,21 +109,20 @@ const replaceNode = (tree: Tree) => (nodeIndex: number, update: (node: Node) => 
   nodes: tree.nodes.map(n => (n.index === nodeIndex ? update(n) : n)),
 })
 
-export const createTree = (initialState: State): Tree => ({
+export const createTree = (config: Config) => (initialState: State): Tree => ({
+  config,
   nodes: [createNode(initialState, 0)],
 })
 
-const nextRandomMove = (config: Config) => (state: State) => {
-  const moves = config.strategy.availableMoves(state)
+const nextRandomMove = ({ config: { strategy} }: Tree) => (state: State) => {
+  const moves = strategy.availableMoves(state)
   return moves[Math.floor(Math.random() * moves.length)]
 }
 
-const selectBestUcbNode = (config: Config) => (tree: Tree, node: Node): Node => {
-  const childNodes = getChildren(tree)(node)
+const selectBestUcbNode = (tree: Tree, node: Node): Node => {
+  const { config } = tree
 
-  // console.log("NODE=====>\n", node)
-  // console.log("childNodes=====>\n", childNodes)
-  // console.log("childNodes UCB=====>\n", childNodes.map(config.calcUcb(tree)))
+  const childNodes = getChildren(tree)(node)
 
   const firstNode = childNodes[0]
   const bestUcbNode = childNodes.reduce(
@@ -132,26 +136,24 @@ const selectBestUcbNode = (config: Config) => (tree: Tree, node: Node): Node => 
   return bestUcbNode.bestNode
 }
 
-const expand = (config: Config) => (tree: Tree, node: Node) => {
-  const r = isLeaf(node) ? addChildNodes(config)(tree, node) : { tree, node }
-  // console.log("EXPAND=====>\n", r.node)
-  return visit(config)(r.tree, r.node)
+const expand = (tree: Tree, node: Node) => {
+  const r = isLeaf(node) ? addChildNodes(tree, node) : { tree, node }
+  return visit(r.tree, r.node)
 }
 
-const rolloutValue = (config: Config) => (state: State): number => {
-  const nextMove = config.strategy.nextMove ? config.strategy.nextMove(state) : nextRandomMove(config)(state)
+const rolloutValue = (tree: Tree) => (state: State): number => {
+  const { config: { strategy} } = tree
+
+  const nextMove = strategy.nextMove ? strategy.nextMove(state) : nextRandomMove(tree)(state)
   return nextMove
-    ? rolloutValue(config)(config.strategy.nextState(state, nextMove))
-    : config.strategy.calcValue(state) || 0
+    ? rolloutValue(tree)(strategy.nextState(state, nextMove))
+    : strategy.calcValue(state) || 0
 }
 
-const rollout = (config: Config) => (tree: Tree) => (state: State): TreeResult => {
-  // console.log("ROLLOUT=====>\n", state)
-  return {
-    tree,
-    value: rolloutValue(config)(state),
-  }
-}
+const rollout = (tree: Tree) => (state: State): TreeResult => ({
+  tree,
+  value: rolloutValue(tree)(state),
+})
 
 // const backPropagate = (tree: Tree) => (value: number, node?: Node): Tree =>
 //   node
@@ -161,27 +163,19 @@ const rollout = (config: Config) => (tree: Tree) => (state: State): TreeResult =
 //       )
 //     : tree
 
-const visit = (config: Config) => (tree: Tree, node: Node): TreeResult => {
-  const bestUcbNode = selectBestUcbNode(config)(tree, node)
+const visit = (tree: Tree, node: Node): TreeResult => {
+  const { config: { strategy} } = tree
 
-  // console.log("NODE=====>\n", node)
-  // console.log(
-  //   "BEST=====>\n",
-  //   bestUcbNode,
-  //   config.strategy.calcValue(bestUcbNode.state),
-  //   config.strategy.isFinal(bestUcbNode.state),
-  // )
-  // console.log("BEST UCB NODE  ===========>", bestUcbNode.index)
-  // console.log("ISFINAL=====>\n", config.strategy.isFinal(bestUcbNode.state))
+  const bestUcbNode = selectBestUcbNode(tree, node)
 
-  const newTreeResult = config.strategy.isFinal(bestUcbNode.state)
+  const newTreeResult = strategy.isFinal(bestUcbNode.state)
     ? {
         tree,
-        value: config.strategy.calcValue(bestUcbNode.state) || 0,
+        value: strategy.calcValue(bestUcbNode.state) || 0,
       }
     : bestUcbNode.visits === 0
-    ? rollout(config)(tree)(bestUcbNode.state)
-    : expand(config)(tree, bestUcbNode)
+    ? rollout(tree)(bestUcbNode.state)
+    : expand(tree, bestUcbNode)
 
   const updatedTree = replaceNode(newTreeResult.tree)(bestUcbNode.index, n => ({
     ...n,
@@ -197,14 +191,12 @@ const visit = (config: Config) => (tree: Tree, node: Node): TreeResult => {
   }
 }
 
-export const findBestNodeIteration = (config: Config) => (tree: Tree) => visit(config)(tree, tree.nodes[0])
+export const findBestNodeIteration = (tree: Tree) => visit(tree, tree.nodes[0])
 
-export const findBestNode2 = (config: Config) => (tree: Tree, iterations: number) => {
-  const findBest = findBestNodeIteration(config)
-
+export const findBestNode2 =  (tree: Tree, iterations: number) => {
   const newTreeResult = R.range(1, iterations + 1).reduce(
     acc => {
-      const r = findBest(acc.tree)
+      const r = findBestNodeIteration(acc.tree)
       const newTree = replaceNode(r.tree)(getRoot(r.tree).index, n => ({
         ...n,
         value: n.value + r.value,
@@ -227,5 +219,5 @@ export const findBestNode2 = (config: Config) => (tree: Tree, iterations: number
   return { tree: newTreeResult.tree, node: children.find(c => c.value === maxValue)! }
 }
 
-export const findBestNode = (config: Config) => (tree: Tree, iterations: number = 100) =>
-  findBestNode2(config)(addChildNodes(config)(tree, getRoot(tree)).tree, iterations)
+export const findBestNode = (tree: Tree, iterations: number = 100) =>
+  findBestNode2(addChildNodes(tree, getRoot(tree)).tree, iterations)
