@@ -1,5 +1,5 @@
-import * as TicTacToe from "../src/games/TicTacToe"
-import * as MCTS from "../src/mcts"
+import * as TicTacToe from "./games/TicTacToe"
+import * as MCTS from "./mcts"
 
 const calcNodeValue = (state: TicTacToe.GameState) =>
   TicTacToe.playerWins(state.board, "X") ? 1 : TicTacToe.playerWins(state.board, "O") ? -1 : undefined
@@ -27,13 +27,6 @@ const run = () => {
 
   const rootNodes = MCTS.getChildren(tree)(MCTS.getRoot(tree))
 
-  // console.log("FINAL TREE=====>\n", JSON.stringify(tree, null, 2))
-  // console.log("ROOT NODES=====>\n", JSON.stringify(rootNodes, null, 2))
-
-  console.log("BEST NODE=====>\n", node)
-
 }
 
 run()
-
-// console.log("=====>\n", Math.log(2))

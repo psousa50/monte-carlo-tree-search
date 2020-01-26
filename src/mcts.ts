@@ -183,9 +183,9 @@ const visit = (tree: Tree, node: Node): TreeResult => {
   return updateTreeNode(updatedTree)(bestNode, value)
 }
 
-export const findBestNodeForRoot = (tree: Tree) => visit(tree, tree.nodes[0])
+const findBestNodeForRoot = (tree: Tree) => visit(tree, tree.nodes[0])
 
-export const traverseTree = (tree: Tree, iterations: number) =>
+const traverseTree = (tree: Tree, iterations: number) =>
   R.range(1, iterations + 1).reduce(
     acc => {
       const { tree: updatedTree, value } = findBestNodeForRoot(acc.tree)
