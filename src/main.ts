@@ -23,9 +23,11 @@ const run = () => {
 
   const game = TicTacToe.create()
 
-  const { tree, node } = MCTS.findBestNode(MCTS.createTree(config)(game), 60)
+  const { tree } = MCTS.findBestNode(MCTS.createTree(config)(game, {}), 60)
 
   const rootNodes = MCTS.getChildren(tree)(MCTS.getRoot(tree))
+
+  console.log("=====>\n", rootNodes)
 
 }
 

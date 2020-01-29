@@ -5,10 +5,12 @@ export const NO_PARENT = -1
 
 type State = any
 type Move = any
+type GameInfo = any
 
 export interface Tree<S = State, M = Move> {
   config: Config<S, M>
   nodes: ReadonlyArray<Node>
+  gameInfo: GameInfo
 }
 
 export interface Node {
@@ -26,9 +28,9 @@ export interface Config<S = State, M = Move> {
   strategy: Strategy<S, M>
 }
 
-export interface Strategy<S = State, M = Move> {
+export interface Strategy<S = State, M = Move, G = GameInfo> {
   availableMoves: (state: S) => ReadonlyArray<M>
-  calcValue: (state: S) => number | undefined
+  calcValue: (state: S, gameInfo: G) => number | undefined
   isFinal: (state: S) => boolean
   nextMove?: (state: S) => M | undefined
   nextState: (state: S, move: M) => S
@@ -105,8 +107,9 @@ const replaceNode = (tree: Tree) => (nodeIndex: number, update: (node: Node) => 
   nodes: tree.nodes.map(n => (n.index === nodeIndex ? update(n) : n)),
 })
 
-export const createTree = (config: Config) => (initialState: State): Tree => ({
+export const createTree = (config: Config) => (initialState: State, gameInfo: GameInfo): Tree => ({
   config,
+  gameInfo,
   nodes: [createNode(initialState, 0)],
 })
 
@@ -141,10 +144,11 @@ const expand = (tree: Tree) => (node: Node) => {
 const rolloutValue = (tree: Tree) => (state: State): number => {
   const {
     config: { strategy },
+    gameInfo,
   } = tree
 
   const nextMove = strategy.nextMove ? strategy.nextMove(state) : nextRandomMove(tree)(state)
-  return nextMove ? rolloutValue(tree)(strategy.nextState(state, nextMove)) : strategy.calcValue(state) || 0
+  return nextMove ? rolloutValue(tree)(strategy.nextState(state, nextMove)) : strategy.calcValue(state, gameInfo) || 0
 }
 
 const rollout = (tree: Tree) => (node: Node): TreeResult => ({
@@ -154,7 +158,7 @@ const rollout = (tree: Tree) => (node: Node): TreeResult => ({
 
 const getStateValue = (tree: Tree) => (node: Node) => ({
   tree,
-  value: tree.config.strategy.calcValue(node.state) || 0,
+  value: tree.config.strategy.calcValue(node.state, tree.gameInfo) || 0,
 })
 
 const updateNodeStats = (value: number) => (node: Node) => ({
