@@ -121,6 +121,7 @@ const selectBestNode = (tree: Tree) => (node: Node): Node => {
   const childNodes = getChildren(tree)(node)
 
   const firstNode = childNodes[0]
+
   const bestUcbNode = childNodes.reduce(
     (acc, cur) => {
       const ucb = config.calcUcb(tree)(cur)
@@ -133,8 +134,8 @@ const selectBestNode = (tree: Tree) => (node: Node): Node => {
 }
 
 const expand = (tree: Tree) => (node: Node) => {
-  const r = isLeaf(node) ? addChildNodes(tree, node) : { tree, node }
-  return visit(r.tree, r.node)
+  const result = isLeaf(node) ? addChildNodes(tree, node) : { tree, node }
+  return visit(result.tree, result.node)
 }
 
 const rolloutValue = (tree: Tree) => (state: State): number => {
