@@ -1,5 +1,5 @@
-import * as TicTacToe from "./games/TicTacToe"
-import * as MCTS from "./mcts"
+import * as MCTS from "../mcts"
+import * as TicTacToe from "./TicTacToe"
 
 const calcNodeValue = (state: TicTacToe.GameState) =>
   TicTacToe.playerWins(state.board, "X") ? 1 : TicTacToe.playerWins(state.board, "O") ? -1 : undefined
@@ -11,8 +11,6 @@ const strategy: MCTS.Strategy<TicTacToe.GameState, TicTacToe.Move> = {
   nextMove: TicTacToe.nextMove,
   nextState: TicTacToe.move,
 }
-
-// const calcUcb = (_: MCTS.Tree) => (node: MCTS.Node) => 100 - node.visits
 
 const config: MCTS.Config<TicTacToe.GameState, TicTacToe.Move> = {
   calcUcb: MCTS.defaultUcbFormula(),
