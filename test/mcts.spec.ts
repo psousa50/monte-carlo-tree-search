@@ -22,7 +22,7 @@ const gameLogic: MCTS.GameLogic<ThreeHoleGame.GameState, ThreeHoleGame.Move> = {
   currentPlayerIndex,
   isFinal: ThreeHoleGame.isFinal,
   nextState: ThreeHoleGame.move,
-  playerCount: () => 2,
+  playersCount: () => 2,
 }
 
 const config: MCTS.Config<ThreeHoleGame.GameState, ThreeHoleGame.Move> = {

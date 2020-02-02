@@ -16,7 +16,7 @@ const gameLogic: MCTS.GameLogic<TicTacToe.GameState, TicTacToe.Move> = {
   currentPlayerIndex,
   isFinal: TicTacToe.isFinal,
   nextState: TicTacToe.move,
-  playerCount: () => 2,
+  playersCount: () => 2,
 }
 
 const config: MCTS.Config<TicTacToe.GameState, TicTacToe.Move> = {

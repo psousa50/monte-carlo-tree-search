@@ -34,7 +34,7 @@ export interface GameLogic<S = State, M = Move> {
   currentPlayerIndex: (state: S) => number
   isFinal: (state: S) => boolean
   nextState: (state: S, move: M) => S
-  playerCount: () => number
+  playersCount: (state: S) => number
 }
 
 interface TreeResult {
@@ -45,7 +45,7 @@ interface TreeResult {
 const createNode = (
   state: State,
   index: number,
-  playerCount: number,
+  playersCount: number,
   parentIndex: number = NO_PARENT,
   move: Move | undefined = undefined,
 ) => ({
@@ -53,7 +53,7 @@ const createNode = (
   index,
   move,
   parentIndex,
-  scores: R.range(0, playerCount).map(_ => 0),
+  scores: R.range(0, playersCount).map(_ => 0),
   state,
   visits: 0,
 })
@@ -77,7 +77,13 @@ const addChildNodes = (tree: Tree, node: Node) => {
   const nodeIndex = nodes.length
   const childrenMoves = strategy.availableMoves(node.state)
   const children = childrenMoves.map((move, i) =>
-    createNode(strategy.nextState(node.state, move), nodeIndex + i, strategy.playerCount(), node.index, move),
+    createNode(
+      strategy.nextState(node.state, move),
+      nodeIndex + i,
+      strategy.playersCount(node.state),
+      node.index,
+      move,
+    ),
   )
 
   const nodeWithChildren = {
@@ -111,7 +117,7 @@ const replaceNode = (tree: Tree) => (nodeIndex: number, update: (node: Node) => 
 
 export const createTree = (config: Config) => (initialState: State, rootPlayerIndex: number): Tree => ({
   config,
-  nodes: [createNode(initialState, 0, config.gameLogic.playerCount())],
+  nodes: [createNode(initialState, 0, config.gameLogic.playersCount(initialState))],
   rootPlayerIndex,
 })
 
