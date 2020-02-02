@@ -24,15 +24,15 @@ export interface Node {
 
 export interface Config<S = State, M = Move> {
   calcUcb: (tree: Tree) => (node: Node, playerIndex: number) => number
-  strategy: Strategy<S, M>
+  nextMove?: (state: S) => M | undefined
+  gameLogic: GameLogic<S, M>
 }
 
-export interface Strategy<S = State, M = Move> {
+export interface GameLogic<S = State, M = Move> {
   availableMoves: (state: S) => ReadonlyArray<M>
   calcScores: (state: S) => number[]
   currentPlayerIndex: (state: S) => number
   isFinal: (state: S) => boolean
-  nextMove?: (state: S) => M | undefined
   nextState: (state: S, move: M) => S
   playerCount: () => number
 }
@@ -72,7 +72,7 @@ export const defaultUcbFormula = (c: number = sqrt2) => (tree: Tree) => (node: N
 const addChildNodes = (tree: Tree, node: Node) => {
   const {
     nodes,
-    config: { strategy },
+    config: { gameLogic: strategy },
   } = tree
   const nodeIndex = nodes.length
   const childrenMoves = strategy.availableMoves(node.state)
@@ -111,11 +111,11 @@ const replaceNode = (tree: Tree) => (nodeIndex: number, update: (node: Node) => 
 
 export const createTree = (config: Config) => (initialState: State, rootPlayerIndex: number): Tree => ({
   config,
-  nodes: [createNode(initialState, 0, config.strategy.playerCount())],
+  nodes: [createNode(initialState, 0, config.gameLogic.playerCount())],
   rootPlayerIndex,
 })
 
-const nextRandomMove = ({ config: { strategy } }: Tree) => (state: State) => {
+const nextRandomMove = ({ config: { gameLogic: strategy } }: Tree) => (state: State) => {
   const moves = strategy.availableMoves(state)
   return moves[Math.floor(Math.random() * moves.length)]
 }
@@ -127,7 +127,7 @@ const selectBestNode = (tree: Tree) => (node: Node): Node => {
 
   const firstNode = childNodes[0]
 
-  const playerIndex = config.strategy.currentPlayerIndex(node.state)
+  const playerIndex = config.gameLogic.currentPlayerIndex(node.state)
   const bestUcbNode = childNodes.reduce(
     (acc, childNode) => {
       const ucb = config.calcUcb(tree)(childNode, playerIndex)
@@ -146,10 +146,10 @@ const expand = (tree: Tree) => (node: Node) => {
 
 const rolloutValue = (tree: Tree) => (state: State): number[] => {
   const {
-    config: { strategy },
+    config: { gameLogic: strategy },
   } = tree
 
-  const nextMove = strategy.nextMove ? strategy.nextMove(state) : nextRandomMove(tree)(state)
+  const nextMove = tree.config.nextMove ? tree.config.nextMove(state) : nextRandomMove(tree)(state)
   return nextMove ? rolloutValue(tree)(strategy.nextState(state, nextMove)) : strategy.calcScores(state)
 }
 
@@ -159,7 +159,7 @@ const rollout = (tree: Tree) => (node: Node): TreeResult => ({
 })
 
 const getStateScores = (tree: Tree) => (node: Node) => ({
-  scores: tree.config.strategy.calcScores(node.state),
+  scores: tree.config.gameLogic.calcScores(node.state),
   tree,
 })
 
@@ -176,7 +176,7 @@ const updateTreeNode = (tree: Tree) => (node: Node, scores: number[]) => ({
 
 const visit = (tree: Tree) => (node: Node): TreeResult => {
   const {
-    config: { strategy },
+    config: { gameLogic: strategy },
   } = tree
 
   const bestNode = selectBestNode(tree)(node)
