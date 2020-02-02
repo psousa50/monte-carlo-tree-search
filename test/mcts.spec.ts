@@ -56,7 +56,7 @@ describe("mcts", () => {
 
   it("on start scores should be empty", () => {
     const game = ThreeHoleGame.create()
-    const { tree } = MCTS.findBestNode(MCTS.createTree(config)(game, 0), 0)
+    const { tree } = MCTS.findBestNode(MCTS.createTree(config)(game, 0), { maxIterations: 0 })
     const rootNodes = MCTS.getChildren(tree)(MCTS.getRoot(tree))
 
     expect(rootNodes.map(n => n.scores)).toEqual([[0, 0], [0, 0], [0, 0]])
@@ -64,7 +64,7 @@ describe("mcts", () => {
 
   it("on first rollout", () => {
     const game = ThreeHoleGame.create()
-    const { tree } = MCTS.findBestNode(MCTS.createTree(config)(game, 0), 3)
+    const { tree } = MCTS.findBestNode(MCTS.createTree(config)(game, 0), { maxIterations: 3 })
     const rootNodes = MCTS.getChildren(tree)(MCTS.getRoot(tree))
 
     expect(rootNodes.map(n => n.scores)).toEqual([[-1, 1], [1, -1], [1, -1]])
@@ -72,7 +72,7 @@ describe("mcts", () => {
 
   it("on next iteration should select 2nd child", () => {
     const game = ThreeHoleGame.create()
-    const { tree } = MCTS.findBestNode(MCTS.createTree(config)(game, 0), 4)
+    const { tree } = MCTS.findBestNode(MCTS.createTree(config)(game, 0), { maxIterations: 4 })
     const rootNodes = MCTS.getChildren(tree)(MCTS.getRoot(tree))
 
     expect(rootNodes.map(n => n.scores)).toEqual([[-1, 1], [2, -2], [1, -1]])
@@ -81,7 +81,7 @@ describe("mcts", () => {
 
   it("on next iteration should select and expand 3rd child", () => {
     const game = ThreeHoleGame.create()
-    const { tree } = MCTS.findBestNode(MCTS.createTree(config)(game, 0), 5)
+    const { tree } = MCTS.findBestNode(MCTS.createTree(config)(game, 0), { maxIterations: 5})
     const rootNodes = MCTS.getChildren(tree)(MCTS.getRoot(tree))
 
     expect(rootNodes.map(n => n.scores)).toEqual([[-1, 1], [2, -2], [2, -2]])
@@ -92,10 +92,10 @@ describe("mcts", () => {
 
   it("should select best node for current player", () => {
     const game = ThreeHoleGame.create()
-    const { tree: tree1 } = MCTS.findBestNode(MCTS.createTree(config)(game, 0), 16)
+    const { tree: tree1 } = MCTS.findBestNode(MCTS.createTree(config)(game, 0), { maxIterations: 16 })
     const rootNodes1 = MCTS.getChildren(tree1)(MCTS.getRoot(tree1))
 
-    const { tree: tree2 } = MCTS.findBestNode(MCTS.createTree(config)(game, 0), 17)
+    const { tree: tree2 } = MCTS.findBestNode(MCTS.createTree(config)(game, 0), { maxIterations: 17 })
     const rootNodes2 = MCTS.getChildren(tree2)(MCTS.getRoot(tree2))
 
     expect(MCTS.getChildren(tree1)(rootNodes1[2]).map(n => n.visits)).toEqual([1, 1])

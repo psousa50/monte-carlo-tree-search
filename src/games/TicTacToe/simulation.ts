@@ -28,7 +28,7 @@ const config: MCTS.Config<TicTacToe.GameState, TicTacToe.Move> = {
 const run = () => {
   const game = TicTacToe.create()
 
-  const { tree } = MCTS.findBestNode(MCTS.createTree(config)(game, 0), 60)
+  const { tree } = MCTS.findBestNode(MCTS.createTree(config)(game, 0), { timeLimitMs: 5000 })
 
   const rootNodes = MCTS.getChildren(tree)(MCTS.getRoot(tree))
 

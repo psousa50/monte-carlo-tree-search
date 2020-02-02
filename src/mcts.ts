@@ -37,6 +37,11 @@ export interface GameLogic<S = State, M = Move> {
   playersCount: (state: S) => number
 }
 
+export interface Options {
+  maxIterations?: number | undefined
+  timeLimitMs?: number | undefined
+}
+
 interface TreeResult {
   tree: Tree
   scores: number[]
@@ -198,22 +203,35 @@ const visit = (tree: Tree) => (node: Node): TreeResult => {
 
 const findBestNodeForRoot = (tree: Tree) => visit(tree)(tree.nodes[0])
 
-const traverseTree = (tree: Tree, iterations: number) =>
-  R.range(1, iterations + 1).reduce(
-    acc => {
-      const { tree: updatedTree, scores } = findBestNodeForRoot(acc.tree)
-      return updateTreeNode(updatedTree)(getRoot(updatedTree), scores)
-    },
-    { tree, scores: [] as number[] },
-  )
+const traverseTree = (tree: Tree, options: Options) => {
+   const startTime = Date.now()
+   let iteration = 0
+   while (
+    (options.maxIterations === undefined || iteration < options.maxIterations) &&
+    (options.timeLimitMs === undefined || Date.now() - startTime < options.timeLimitMs)
+  ) {
+    iteration++
+    const { tree: updatedTree1, scores } = findBestNodeForRoot(tree)
+    const { tree: updatedTree2 } = updateTreeNode(updatedTree1)(getRoot(updatedTree1), scores)
+    tree = updatedTree2
+  }
+
+   return {
+     elapsedTimeMs: Date.now() - startTime,
+     iterations: iteration,
+     tree,
+   }
+}
 
 const addRootChildNodes = (tree: Tree) => addChildNodes(tree, getRoot(tree)).tree
 
-export const findBestNode = (tree: Tree, iterations: number = 100) => {
-  const result = traverseTree(addRootChildNodes(tree), iterations)
+export const findBestNode = (tree: Tree, options: Options) => {
+  const { tree: updatedTree, iterations, elapsedTimeMs} = traverseTree(addRootChildNodes(tree), options)
 
-  const children = getChildren(result.tree)(getRoot(result.tree))
+  console.log(`Iterations: ${iterations}, Elappsed Time: ${elapsedTimeMs}`)
+
+  const children = getChildren(updatedTree)(getRoot(updatedTree))
   const maxValue = maxNumber(children.map(c => c.scores[tree.rootPlayerIndex]))
 
-  return { tree: result.tree, node: children.find(c => c.scores[tree.rootPlayerIndex] === maxValue)! }
+  return { tree: updatedTree, node: children.find(c => c.scores[tree.rootPlayerIndex] === maxValue)! }
 }
