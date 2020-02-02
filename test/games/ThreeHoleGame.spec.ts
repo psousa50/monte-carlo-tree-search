@@ -1,4 +1,4 @@
-import * as ThreeHoleGame from "../../src/games/ThreeHoleGame"
+import * as ThreeHoleGame from "../../src/games/ThreeHoleGame/game"
 
 describe("ThreeHoleGame", () => {
   it("creates a game", () => {
@@ -77,29 +77,6 @@ describe("ThreeHoleGame", () => {
 
     it("is not filled then game is not final", () => {
       expect(ThreeHoleGame.isFinal(ThreeHoleGame.move(ThreeHoleGame.create(), { piece: "X", position: 0 }))).toBeFalsy()
-    })
-  })
-
-  describe("nextMove", () => {
-    it("returns first move", () => {
-      expect(ThreeHoleGame.nextMove(ThreeHoleGame.create())).toEqual({
-        piece: "X",
-        position: 0,
-      })
-    })
-
-    it("returns undefined if no move is available", () => {
-      expect(
-        ThreeHoleGame.nextMove(
-          ThreeHoleGame.move(
-            ThreeHoleGame.move(ThreeHoleGame.move(ThreeHoleGame.create(), { piece: "X", position: 0 }), {
-              piece: "X",
-              position: 1,
-            }),
-            { piece: "X", position: 2 },
-          ),
-        ),
-      ).toBeUndefined()
     })
   })
 })

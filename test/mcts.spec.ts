@@ -1,23 +1,33 @@
-import * as R from "ramda"
-import * as ThreeHoleGame from "../src/games/ThreeHoleGame"
+import * as ThreeHoleGame from "../src/games/ThreeHoleGame/game"
+import { playerWins } from "../src/games/TicTacToe/game"
 import * as MCTS from "../src/mcts"
-import { DeepPartial } from "../src/utils/types"
 
-const calcNodeValue = (state: ThreeHoleGame.GameState) =>
-  state.holes[1] === "X" ? 1 : state.holes[1] === "O" ? -1 : undefined
+const playerPiece = (playerIndex: number) => playerIndex === 0 ? "X" : "O"
+
+const calcScore = (state: ThreeHoleGame.GameState, playerIndex: number) =>
+  state.holes[1] === playerPiece(playerIndex) ? 1 : state.holes[1] === playerPiece(1 - playerIndex) ? -1 : 0
+
+const calcScores = (state: ThreeHoleGame.GameState) => [calcScore(state, 0), calcScore(state, 1)]
+
+const currentPlayerIndex = (state: ThreeHoleGame.GameState) => state.player === "X" ? 0 : 1
+
+const nextMove = (state: ThreeHoleGame.GameState) => {
+  const moves = ThreeHoleGame.availableMoves(state)
+  return moves.length > 0 ? moves[0] : undefined
+}
 
 const strategy: MCTS.Strategy<ThreeHoleGame.GameState, ThreeHoleGame.Move> = {
   availableMoves: ThreeHoleGame.availableMoves,
-  calcValue: calcNodeValue,
+  calcScores,
+  currentPlayerIndex,
   isFinal: ThreeHoleGame.isFinal,
-  nextMove: ThreeHoleGame.nextMove,
+  nextMove,
   nextState: ThreeHoleGame.move,
+  playerCount: () => 2,
 }
 
-const calcUcb = (_: MCTS.Tree) => (node: MCTS.Node) => 100 - node.visits
-
 const config: MCTS.Config<ThreeHoleGame.GameState, ThreeHoleGame.Move> = {
-  calcUcb,
+  calcUcb: MCTS.defaultUcbFormula(),
   strategy,
 }
 
@@ -25,44 +35,71 @@ describe("mcts", () => {
   it("creates an mcts tree", () => {
     const game = ThreeHoleGame.create()
 
-    const tree = MCTS.createTree(config)(game)
+    const tree = MCTS.createTree(config)(game, 0)
 
-    const root = ({
+    const root = {
       children: [],
       index: 0,
       parentIndex: MCTS.NO_PARENT,
+      scores: [0, 0],
       state: game,
-      value: 0,
       visits: 0,
-    })
-    const expectedTree = ({
+    }
+    const expectedTree = {
       config,
       nodes: [root],
-    })
+      rootPlayerIndex: 0,
+    }
 
     expect(tree).toEqual(expectedTree)
   })
 
-  it("runs first level rollout", () => {
+  it("on start scores should be empty", () => {
     const game = ThreeHoleGame.create()
-    const { tree } = MCTS.findBestNode(MCTS.createTree(config)(game), 3)
+    const { tree } = MCTS.findBestNode(MCTS.createTree(config)(game, 0), 0)
     const rootNodes = MCTS.getChildren(tree)(MCTS.getRoot(tree))
 
-    expect(rootNodes.map(n => n.value)).toEqual([-1, 1, 1])
+    expect(rootNodes.map(n => n.scores)).toEqual([[0, 0], [0, 0], [0, 0]])
   })
 
-  it("runs second level rollout", () => {
+  it("on first rollout", () => {
     const game = ThreeHoleGame.create()
-    const { tree } = MCTS.findBestNode(MCTS.createTree(config)(game), 4)
+    const { tree } = MCTS.findBestNode(MCTS.createTree(config)(game, 0), 3)
     const rootNodes = MCTS.getChildren(tree)(MCTS.getRoot(tree))
 
-    expect(rootNodes.map(n => n.value)).toEqual([-2, 1, 1])
+    expect(rootNodes.map(n => n.scores)).toEqual([[-1, 1], [1, -1], [1, -1]])
   })
 
-  it("long simulation return best move which is play at the middle hole", () => {
+  it("on next iteration should select 2nd child", () => {
     const game = ThreeHoleGame.create()
-    const { node } = MCTS.findBestNode(MCTS.createTree(config)(game), 50)
+    const { tree } = MCTS.findBestNode(MCTS.createTree(config)(game, 0), 4)
+    const rootNodes = MCTS.getChildren(tree)(MCTS.getRoot(tree))
 
-    expect(node.index).toEqual(2)
+    expect(rootNodes.map(n => n.scores)).toEqual([[-1, 1], [2, -2], [1, -1]])
+    expect(rootNodes.map(n => n.visits)).toEqual([1, 2, 1])
   })
+
+  it("on next iteration should select and expand 3rd child", () => {
+    const game = ThreeHoleGame.create()
+    const { tree } = MCTS.findBestNode(MCTS.createTree(config)(game, 0), 5)
+    const rootNodes = MCTS.getChildren(tree)(MCTS.getRoot(tree))
+
+    expect(rootNodes.map(n => n.scores)).toEqual([[-1, 1], [2, -2], [2, -2]])
+    expect(rootNodes.map(n => n.visits)).toEqual([1, 2, 2])
+    expect(MCTS.getChildren(tree)(rootNodes[2]).map(n => n.scores)).toEqual([[1, -1], [0, 0]])
+    expect(MCTS.getChildren(tree)(rootNodes[2]).map(n => n.visits)).toEqual([1, 0])
+  })
+
+  it("should select best node for current player", () => {
+    const game = ThreeHoleGame.create()
+    const { tree: tree1 } = MCTS.findBestNode(MCTS.createTree(config)(game, 0), 16)
+    const rootNodes1 = MCTS.getChildren(tree1)(MCTS.getRoot(tree1))
+
+    const { tree: tree2 } = MCTS.findBestNode(MCTS.createTree(config)(game, 0), 17)
+    const rootNodes2 = MCTS.getChildren(tree2)(MCTS.getRoot(tree2))
+
+    expect(MCTS.getChildren(tree1)(rootNodes1[2]).map(n => n.visits)).toEqual([1, 1])
+    expect(MCTS.getChildren(tree2)(rootNodes2[2]).map(n => n.visits)).toEqual([1, 2])
+  })
+
 })

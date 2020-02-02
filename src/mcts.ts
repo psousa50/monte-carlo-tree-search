@@ -5,12 +5,11 @@ export const NO_PARENT = -1
 
 type State = any
 type Move = any
-type GameInfo = any
 
 export interface Tree<S = State, M = Move> {
   config: Config<S, M>
   nodes: ReadonlyArray<Node>
-  gameInfo: GameInfo
+  rootPlayerIndex: number
 }
 
 export interface Node {
@@ -19,31 +18,34 @@ export interface Node {
   move?: Move
   parentIndex: number
   state: State
-  value: number
+  scores: number[]
   visits: number
 }
 
 export interface Config<S = State, M = Move> {
-  calcUcb: (tree: Tree) => (node: Node) => number
+  calcUcb: (tree: Tree) => (node: Node, playerIndex: number) => number
   strategy: Strategy<S, M>
 }
 
-export interface Strategy<S = State, M = Move, G = GameInfo> {
+export interface Strategy<S = State, M = Move> {
   availableMoves: (state: S) => ReadonlyArray<M>
-  calcValue: (state: S, gameInfo: G) => number | undefined
+  calcScores: (state: S) => number[]
+  currentPlayerIndex: (state: S) => number
   isFinal: (state: S) => boolean
   nextMove?: (state: S) => M | undefined
   nextState: (state: S, move: M) => S
+  playerCount: () => number
 }
 
 interface TreeResult {
   tree: Tree
-  value: number
+  scores: number[]
 }
 
 const createNode = (
   state: State,
   index: number,
+  playerCount: number,
   parentIndex: number = NO_PARENT,
   move: Move | undefined = undefined,
 ) => ({
@@ -51,8 +53,8 @@ const createNode = (
   index,
   move,
   parentIndex,
+  scores: R.range(0, playerCount).map(_ => 0),
   state,
-  value: 0,
   visits: 0,
 })
 
@@ -62,10 +64,10 @@ const parentVisits = (tree: Tree) => (node: Node) => {
 }
 
 const sqrt2 = Math.sqrt(2)
-export const defaultUcbFormula = (c: number = sqrt2) => (tree: Tree) => (node: Node) =>
+export const defaultUcbFormula = (c: number = sqrt2) => (tree: Tree) => (node: Node, playerIndex: number) =>
   node.visits === 0
     ? Infinity
-    : node.value / node.visits + c * Math.sqrt(Math.log(parentVisits(tree)(node)) / node.visits)
+    : node.scores[playerIndex] / node.visits + c * Math.sqrt(Math.log(parentVisits(tree)(node)) / node.visits)
 
 const addChildNodes = (tree: Tree, node: Node) => {
   const {
@@ -75,7 +77,7 @@ const addChildNodes = (tree: Tree, node: Node) => {
   const nodeIndex = nodes.length
   const childrenMoves = strategy.availableMoves(node.state)
   const children = childrenMoves.map((move, i) =>
-    createNode(strategy.nextState(node.state, move), nodeIndex + i, node.index, move),
+    createNode(strategy.nextState(node.state, move), nodeIndex + i, strategy.playerCount(), node.index, move),
   )
 
   const nodeWithChildren = {
@@ -107,10 +109,10 @@ const replaceNode = (tree: Tree) => (nodeIndex: number, update: (node: Node) => 
   nodes: tree.nodes.map(n => (n.index === nodeIndex ? update(n) : n)),
 })
 
-export const createTree = (config: Config) => (initialState: State, gameInfo: GameInfo): Tree => ({
+export const createTree = (config: Config) => (initialState: State, rootPlayerIndex: number): Tree => ({
   config,
-  gameInfo,
-  nodes: [createNode(initialState, 0)],
+  nodes: [createNode(initialState, 0, config.strategy.playerCount())],
+  rootPlayerIndex,
 })
 
 const nextRandomMove = ({ config: { strategy } }: Tree) => (state: State) => {
@@ -125,12 +127,13 @@ const selectBestNode = (tree: Tree) => (node: Node): Node => {
 
   const firstNode = childNodes[0]
 
+  const playerIndex = config.strategy.currentPlayerIndex(node.state)
   const bestUcbNode = childNodes.reduce(
-    (acc, cur) => {
-      const ucb = config.calcUcb(tree)(cur)
-      return ucb > acc.bestUcb ? { bestNode: cur, bestUcb: ucb } : acc
+    (acc, childNode) => {
+      const ucb = config.calcUcb(tree)(childNode, playerIndex)
+      return ucb > acc.bestUcb ? { bestNode: childNode, bestUcb: ucb } : acc
     },
-    { bestNode: firstNode, bestUcb: config.calcUcb(tree)(firstNode) },
+    { bestNode: firstNode, bestUcb: config.calcUcb(tree)(firstNode, playerIndex) },
   )
 
   return bestUcbNode.bestNode
@@ -138,65 +141,64 @@ const selectBestNode = (tree: Tree) => (node: Node): Node => {
 
 const expand = (tree: Tree) => (node: Node) => {
   const result = isLeaf(node) ? addChildNodes(tree, node) : { tree, node }
-  return visit(result.tree, result.node)
+  return visit(result.tree)(result.node)
 }
 
-const rolloutValue = (tree: Tree) => (state: State): number => {
+const rolloutValue = (tree: Tree) => (state: State): number[] => {
   const {
     config: { strategy },
-    gameInfo,
   } = tree
 
   const nextMove = strategy.nextMove ? strategy.nextMove(state) : nextRandomMove(tree)(state)
-  return nextMove ? rolloutValue(tree)(strategy.nextState(state, nextMove)) : strategy.calcValue(state, gameInfo) || 0
+  return nextMove ? rolloutValue(tree)(strategy.nextState(state, nextMove)) : strategy.calcScores(state)
 }
 
 const rollout = (tree: Tree) => (node: Node): TreeResult => ({
+  scores: rolloutValue(tree)(node.state),
   tree,
-  value: rolloutValue(tree)(node.state),
 })
 
-const getStateValue = (tree: Tree) => (node: Node) => ({
+const getStateScores = (tree: Tree) => (node: Node) => ({
+  scores: tree.config.strategy.calcScores(node.state),
   tree,
-  value: tree.config.strategy.calcValue(node.state, tree.gameInfo) || 0,
 })
 
-const updateNodeStats = (value: number) => (node: Node) => ({
+const updateNodeStats = (scores: number[]) => (node: Node) => ({
   ...node,
-  value: node.value + value,
+  scores: node.scores.map((s, i) => s + scores[i]),
   visits: node.visits + 1,
 })
 
-const updateTreeNode = (tree: Tree) => (node: Node, value: number) => ({
-  tree: replaceNode(tree)(node.index, updateNodeStats(value)),
-  value,
+const updateTreeNode = (tree: Tree) => (node: Node, scores: number[]) => ({
+  scores,
+  tree: replaceNode(tree)(node.index, updateNodeStats(scores)),
 })
 
-const visit = (tree: Tree, node: Node): TreeResult => {
+const visit = (tree: Tree) => (node: Node): TreeResult => {
   const {
     config: { strategy },
   } = tree
 
   const bestNode = selectBestNode(tree)(node)
 
-  const { tree: updatedTree, value } = strategy.isFinal(bestNode.state)
-    ? getStateValue(tree)(bestNode)
+  const { tree: updatedTree, scores } = strategy.isFinal(bestNode.state)
+    ? getStateScores(tree)(bestNode)
     : bestNode.visits === 0
     ? rollout(tree)(bestNode)
     : expand(tree)(bestNode)
 
-  return updateTreeNode(updatedTree)(bestNode, value)
+  return updateTreeNode(updatedTree)(bestNode, scores)
 }
 
-const findBestNodeForRoot = (tree: Tree) => visit(tree, tree.nodes[0])
+const findBestNodeForRoot = (tree: Tree) => visit(tree)(tree.nodes[0])
 
 const traverseTree = (tree: Tree, iterations: number) =>
   R.range(1, iterations + 1).reduce(
     acc => {
-      const { tree: updatedTree, value } = findBestNodeForRoot(acc.tree)
-      return updateTreeNode(updatedTree)(getRoot(updatedTree), value)
+      const { tree: updatedTree, scores } = findBestNodeForRoot(acc.tree)
+      return updateTreeNode(updatedTree)(getRoot(updatedTree), scores)
     },
-    { tree, value: 0 },
+    { tree, scores: [] as number[] },
   )
 
 const addRootChildNodes = (tree: Tree) => addChildNodes(tree, getRoot(tree)).tree
@@ -205,7 +207,7 @@ export const findBestNode = (tree: Tree, iterations: number = 100) => {
   const result = traverseTree(addRootChildNodes(tree), iterations)
 
   const children = getChildren(result.tree)(getRoot(result.tree))
-  const maxValue = maxNumber(children.map(c => c.value))
+  const maxValue = maxNumber(children.map(c => c.scores[tree.rootPlayerIndex]))
 
-  return { tree: result.tree, node: children.find(c => c.value === maxValue)! }
+  return { tree: result.tree, node: children.find(c => c.scores[tree.rootPlayerIndex] === maxValue)! }
 }

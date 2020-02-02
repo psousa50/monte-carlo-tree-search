@@ -1,5 +1,5 @@
-type Player = "X" | "O"
-type Piece = "X" | "O" | "."
+export type Player = "X" | "O"
+export type Piece = "X" | "O" | "."
 
 export interface Move {
   position: number
@@ -37,11 +37,6 @@ export const move = (state: GameState, { piece, position }: Move) => {
     ...newState,
     player: isFinal(newState) ?  newState.player : otherPlayer(newState.player),
   }
-}
-
-export const nextMove = (state: GameState) => {
-  const moves = availableMoves(state)
-  return moves.length > 0 ? moves[0] : undefined
 }
 
 export const isFinal = (state: GameState) => state.holes[1] !== "."
