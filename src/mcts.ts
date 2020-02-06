@@ -226,12 +226,17 @@ const traverseTree = (tree: Tree, options: Options) => {
 const addRootChildNodes = (tree: Tree) => addChildNodes(tree, getRoot(tree)).tree
 
 export const findBestNode = (tree: Tree, options: Options) => {
-  const { tree: updatedTree, iterations, elapsedTimeMs} = traverseTree(addRootChildNodes(tree), options)
+  const { tree: updatedTree, iterations, elapsedTimeMs } = traverseTree(addRootChildNodes(tree), options)
 
   console.log(`Iterations: ${iterations}, Elappsed Time: ${elapsedTimeMs}`)
 
   const children = getChildren(updatedTree)(getRoot(updatedTree))
   const maxValue = maxNumber(children.map(c => c.scores[tree.rootPlayerIndex]))
 
-  return { tree: updatedTree, node: children.find(c => c.scores[tree.rootPlayerIndex] === maxValue)! }
+  return {
+    bestNode: children.find(c => c.scores[tree.rootPlayerIndex] === maxValue)!,
+    elapsedTimeMs,
+    iterations,
+    tree: updatedTree,
+  }
 }
