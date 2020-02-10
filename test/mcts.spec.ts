@@ -16,19 +16,19 @@ const nextMove = (state: ThreeHoleGame.GameState) => {
   return moves.length > 0 ? moves[0] : undefined
 }
 
-const gameLogic: MCTS.GameLogic<ThreeHoleGame.GameState, ThreeHoleGame.Move> = {
+const gameRules: MCTS.GameRules<ThreeHoleGame.GameState, ThreeHoleGame.Move> = {
   availableMoves: ThreeHoleGame.availableMoves,
-  calcScores,
   currentPlayerIndex,
   isFinal: ThreeHoleGame.isFinal,
+  nextMove,
   nextState: ThreeHoleGame.move,
   playersCount: () => 2,
 }
 
 const config: MCTS.Config<ThreeHoleGame.GameState, ThreeHoleGame.Move> = {
+  calcScores,
   calcUcb: MCTS.defaultUcbFormula(),
-  gameLogic,
-  nextMove,
+  gameRules,
 }
 
 describe("mcts", () => {

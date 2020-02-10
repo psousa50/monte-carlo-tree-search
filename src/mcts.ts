@@ -24,15 +24,15 @@ export interface Node {
 
 export interface Config<S = State, M = Move> {
   calcUcb: (tree: Tree) => (node: Node, playerIndex: number) => number
-  nextMove?: (state: S) => M | undefined
-  gameLogic: GameLogic<S, M>
+  calcScores: (state: S) => number[]
+  gameRules: GameRules<S, M>
 }
 
-export interface GameLogic<S = State, M = Move> {
+export interface GameRules<S = State, M = Move> {
   availableMoves: (state: S) => ReadonlyArray<M>
-  calcScores: (state: S) => number[]
   currentPlayerIndex: (state: S) => number
   isFinal: (state: S) => boolean
+  nextMove?: (state: S) => M | undefined
   nextState: (state: S, move: M) => S
   playersCount: (state: S) => number
 }
@@ -77,15 +77,15 @@ export const defaultUcbFormula = (c: number = sqrt2) => (tree: Tree) => (node: N
 const addChildNodes = (tree: Tree, node: Node) => {
   const {
     nodes,
-    config: { gameLogic: strategy },
+    config: { gameRules },
   } = tree
   const nodeIndex = nodes.length
-  const childrenMoves = strategy.availableMoves(node.state)
+  const childrenMoves = gameRules.availableMoves(node.state)
   const children = childrenMoves.map((move, i) =>
     createNode(
-      strategy.nextState(node.state, move),
+      gameRules.nextState(node.state, move),
       nodeIndex + i,
-      strategy.playersCount(node.state),
+      gameRules.playersCount(node.state),
       node.index,
       move,
     ),
@@ -122,12 +122,12 @@ const replaceNode = (tree: Tree) => (nodeIndex: number, update: (node: Node) => 
 
 export const createTree = (config: Config) => (initialState: State, rootPlayerIndex: number): Tree => ({
   config,
-  nodes: [createNode(initialState, 0, config.gameLogic.playersCount(initialState))],
+  nodes: [createNode(initialState, 0, config.gameRules.playersCount(initialState))],
   rootPlayerIndex,
 })
 
-const nextRandomMove = ({ config: { gameLogic: strategy } }: Tree) => (state: State) => {
-  const moves = strategy.availableMoves(state)
+const nextRandomMove = ({ config: { gameRules } }: Tree) => (state: State) => {
+  const moves = gameRules.availableMoves(state)
   return moves[Math.floor(Math.random() * moves.length)]
 }
 
@@ -138,7 +138,7 @@ const selectBestNode = (tree: Tree) => (node: Node): Node => {
 
   const firstNode = childNodes[0]
 
-  const playerIndex = config.gameLogic.currentPlayerIndex(node.state)
+  const playerIndex = config.gameRules.currentPlayerIndex(node.state)
   const bestUcbNode = childNodes.reduce(
     (acc, childNode) => {
       const ucb = config.calcUcb(tree)(childNode, playerIndex)
@@ -157,11 +157,11 @@ const expand = (tree: Tree) => (node: Node) => {
 
 const rolloutValue = (tree: Tree) => (state: State): number[] => {
   const {
-    config: { gameLogic: strategy },
+    config: { gameRules },
   } = tree
 
-  const nextMove = tree.config.nextMove ? tree.config.nextMove(state) : nextRandomMove(tree)(state)
-  return nextMove ? rolloutValue(tree)(strategy.nextState(state, nextMove)) : strategy.calcScores(state)
+  const nextMove = gameRules.nextMove ? gameRules.nextMove(state) : nextRandomMove(tree)(state)
+  return nextMove ? rolloutValue(tree)(gameRules.nextState(state, nextMove)) : tree.config.calcScores(state)
 }
 
 const rollout = (tree: Tree) => (node: Node): TreeResult => ({
@@ -170,7 +170,7 @@ const rollout = (tree: Tree) => (node: Node): TreeResult => ({
 })
 
 const getStateScores = (tree: Tree) => (node: Node) => ({
-  scores: tree.config.gameLogic.calcScores(node.state),
+  scores: tree.config.calcScores(node.state),
   tree,
 })
 
@@ -187,12 +187,12 @@ const updateTreeNode = (tree: Tree) => (node: Node, scores: number[]) => ({
 
 const visit = (tree: Tree) => (node: Node): TreeResult => {
   const {
-    config: { gameLogic: strategy },
+    config: { gameRules },
   } = tree
 
   const bestNode = selectBestNode(tree)(node)
 
-  const { tree: updatedTree, scores } = strategy.isFinal(bestNode.state)
+  const { tree: updatedTree, scores } = gameRules.isFinal(bestNode.state)
     ? getStateScores(tree)(bestNode)
     : bestNode.visits === 0
     ? rollout(tree)(bestNode)
