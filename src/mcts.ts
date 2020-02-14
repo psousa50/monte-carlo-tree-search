@@ -1,5 +1,5 @@
 import * as R from "ramda"
-import { maxNumber } from "./utils/collections"
+import { maxNumber, maxNumberBy } from "./utils/collections"
 
 export const NO_PARENT = -1
 
@@ -22,9 +22,27 @@ export interface Node {
   visits: number
 }
 
+export enum NotificationType {
+  started = "started",
+  finished = "finished",
+  nodeSelected = "nodeSelected",
+  nodeExpanded = "nodeExpanded",
+  nodeRollout = "nodeRollout",
+  calculatedScore = "calculatedScore",
+}
+
+export interface Notification {
+  type: NotificationType
+  timestamp: number
+  node: Node
+  iterationCount: number
+  elapsedTime: number
+}
+
 export interface Config<S = State, M = Move> {
   calcUcb: (tree: Tree) => (node: Node, playerIndex: number) => number
   calcScores: (state: S) => number[]
+  notifier?: (notification: Notification) => void
   gameRules: GameRules<S, M>
 }
 
@@ -46,6 +64,26 @@ interface TreeResult {
   tree: Tree
   scores: number[]
 }
+
+const createNotification = (
+  type: NotificationType,
+  node: Node,
+  elapsedTime: number = 0,
+  iterationCount: number = 0,
+): Notification => ({
+  elapsedTime,
+  iterationCount,
+  node,
+  timestamp: Date.now(),
+  type,
+})
+
+const notify = (tree: Tree) => (
+  type: NotificationType,
+  node: Node,
+  elapsedTime: number = 0,
+  iterationCount: number = 0,
+) => tree.config.notifier && tree.config.notifier(createNotification(type, node, elapsedTime, iterationCount))
 
 const createNode = (
   state: State,
@@ -147,10 +185,13 @@ const selectBestNode = (tree: Tree) => (node: Node): Node => {
     { bestNode: firstNode, bestUcb: config.calcUcb(tree)(firstNode, playerIndex) },
   )
 
+  notify(tree)(NotificationType.nodeSelected, bestUcbNode.bestNode)
+
   return bestUcbNode.bestNode
 }
 
 const expand = (tree: Tree) => (node: Node) => {
+  notify(tree)(NotificationType.nodeExpanded, node)
   const result = isLeaf(node) ? addChildNodes(tree, node) : { tree, node }
   return visit(result.tree)(result.node)
 }
@@ -164,10 +205,13 @@ const rolloutValue = (tree: Tree) => (state: State): number[] => {
   return nextMove ? rolloutValue(tree)(gameRules.nextState(state, nextMove)) : tree.config.calcScores(state)
 }
 
-const rollout = (tree: Tree) => (node: Node): TreeResult => ({
-  scores: rolloutValue(tree)(node.state),
-  tree,
-})
+const rollout = (tree: Tree) => (node: Node): TreeResult => {
+  notify(tree)(NotificationType.nodeRollout, node)
+  return {
+    scores: rolloutValue(tree)(node.state),
+    tree,
+  }
+}
 
 const getStateScores = (tree: Tree) => (node: Node) => ({
   scores: tree.config.calcScores(node.state),
@@ -192,51 +236,56 @@ const visit = (tree: Tree) => (node: Node): TreeResult => {
 
   const bestNode = selectBestNode(tree)(node)
 
-  const { tree: updatedTree, scores } = gameRules.isFinal(bestNode.state)
+  const treeResult = gameRules.isFinal(bestNode.state)
     ? getStateScores(tree)(bestNode)
     : bestNode.visits === 0
     ? rollout(tree)(bestNode)
     : expand(tree)(bestNode)
 
-  return updateTreeNode(updatedTree)(bestNode, scores)
+  notify(treeResult.tree)(NotificationType.calculatedScore, { ...bestNode, scores: treeResult.scores })
+
+  return updateTreeNode(treeResult.tree)(bestNode, treeResult.scores)
 }
 
 const findBestNodeForRoot = (tree: Tree) => visit(tree)(tree.nodes[0])
 
-const traverseTree = (tree: Tree, options: Options) => {
-   const startTime = Date.now()
-   let iteration = 0
-   while (
-    (options.maxIterations === undefined || iteration < options.maxIterations) &&
-    (options.timeLimitMs === undefined || Date.now() - startTime < options.timeLimitMs)
-  ) {
-    iteration++
-    const { tree: updatedTree1, scores } = findBestNodeForRoot(tree)
-    const { tree: updatedTree2 } = updateTreeNode(updatedTree1)(getRoot(updatedTree1), scores)
-    tree = updatedTree2
-  }
+const simulationDone = (options: Options, startTime: number, iterationCount: number) =>
+  (options.maxIterations !== undefined && iterationCount >= options.maxIterations) ||
+  (options.timeLimitMs !== undefined && Date.now() - startTime >= options.timeLimitMs)
 
-   return {
-     elapsedTimeMs: Date.now() - startTime,
-     iterations: iteration,
-     tree,
-   }
+const traverseTree = (tree: Tree, options: Options) => {
+  const startTime = Date.now()
+  let iterationCount = 0
+  while (!simulationDone(options, startTime, iterationCount)) {
+    iterationCount++
+    const bestTreeResult = findBestNodeForRoot(tree)
+    const updatedTreeResult = updateTreeNode(bestTreeResult.tree)(getRoot(bestTreeResult.tree), bestTreeResult.scores)
+    tree = updatedTreeResult.tree
+  }
+  return {
+    elapsedTimeMs: Date.now() - startTime,
+    iterationCount,
+    tree,
+  }
 }
 
 const addRootChildNodes = (tree: Tree) => addChildNodes(tree, getRoot(tree)).tree
 
+const calcBestNode = (tree: Tree) => {
+  const rootChildren = getChildren(tree)(getRoot(tree))
+  const bestNode = maxNumberBy(rootChildren, node => node.scores[tree.rootPlayerIndex])!
+  return bestNode
+}
+
 export const findBestNode = (tree: Tree, options: Options) => {
-  const { tree: updatedTree, iterations, elapsedTimeMs } = traverseTree(addRootChildNodes(tree), options)
+  notify(tree)(NotificationType.started, getRoot(tree))
+  const treeResult = traverseTree(addRootChildNodes(tree), options)
 
-  console.log(`Iterations: ${iterations}, Elappsed Time: ${elapsedTimeMs}`)
-
-  const children = getChildren(updatedTree)(getRoot(updatedTree))
-  const maxValue = maxNumber(children.map(c => c.scores[tree.rootPlayerIndex]))
+  const bestNode = calcBestNode(treeResult.tree)
+  notify(tree)(NotificationType.finished, bestNode, treeResult.iterationCount, treeResult.elapsedTimeMs)
 
   return {
-    bestNode: children.find(c => c.scores[tree.rootPlayerIndex] === maxValue)!,
-    elapsedTimeMs,
-    iterations,
-    tree: updatedTree,
+    bestNode,
+    ...treeResult,
   }
 }
