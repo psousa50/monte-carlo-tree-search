@@ -119,36 +119,6 @@ export const defaultUctFormula = (c: number = sqrt2) => (tree: Tree) => (node: N
     ? Infinity
     : node.scores[playerIndex] / node.visits + c * Math.sqrt(Math.log(parentVisits(tree)(node)) / node.visits)
 
-const addChildNodes = ({ tree, node }: TreeNode) => {
-  const {
-    nodes,
-    config: { gameRules },
-  } = tree
-  const nodeIndex = nodes.length
-  const childrenMoves = gameRules.availableMoves(node.state)
-  const children = childrenMoves.map((move, i) =>
-    createNode(
-      gameRules.nextState(node.state, move),
-      nodeIndex + i,
-      gameRules.playersCount(node.state),
-      node.index,
-      move,
-    ),
-  )
-
-  const nodeWithChildren = {
-    ...node,
-    children: children.map(c => c.index),
-  }
-  return {
-    node: nodeWithChildren,
-    tree: {
-      ...tree,
-      nodes: [...tree.nodes.map(n => (n.index === node.index ? nodeWithChildren : n)), ...children],
-    },
-  }
-}
-
 const isLeaf = (node: Node) => node.children.length === 0
 
 const getNode = (tree: Tree) => (index: number) => tree.nodes[index]
@@ -200,9 +170,38 @@ const selectBestNode = ({ tree, node }: TreeNode) => {
   }
 }
 
+const expand = ({ tree, node }: TreeNode) => {
+  const {
+    nodes,
+    config: { gameRules },
+  } = tree
+  const nodeIndex = nodes.length
+  const childrenMoves = gameRules.availableMoves(node.state)
+  const children = childrenMoves.map((move, i) =>
+    createNode(
+      gameRules.nextState(node.state, move),
+      nodeIndex + i,
+      gameRules.playersCount(node.state),
+      node.index,
+      move,
+    ),
+  )
+
+  const nodeWithChildren = {
+    ...node,
+    children: children.map(c => c.index),
+  }
+  return {
+    node: nodeWithChildren,
+    tree: {
+      ...tree,
+      nodes: [...tree.nodes.map(n => (n.index === node.index ? nodeWithChildren : n)), ...children],
+    },
+  }
+}
 const expandIfLeaf = (treeNode: TreeNode) => {
   if (isLeaf(treeNode.node)) {
-    const expanded = addChildNodes(treeNode)
+    const expanded = expand(treeNode)
     notify(expanded.tree)(NotificationType.nodeExpanded, expanded.node)
     return expanded
   } else {
@@ -255,21 +254,24 @@ const processTree = (initialNode: TreeNode): TreeResult => {
     ? rollout(bestNode)
     : processTree(bestNode)
 
-  notify(treeResult.tree)(NotificationType.calculatedScore, { ...treeResult.node, scores: treeResult.scores })
+  const updatedResult = updateTreeNodeStats(treeResult.tree, bestNode.node, treeResult.scores)
 
-  return updateTreeNodeStats(treeResult.tree, bestNode.node, treeResult.scores)
+  notify(updatedResult.tree)(NotificationType.calculatedScore, updatedResult.node)
+
+  return updatedResult
 }
 
-const findBestNodeForRoot = (tree: Tree) => processTree({ tree, node: tree.nodes[0] })
+const findBestNodeForRoot = (tree: Tree) => processTree({ tree, node: getRoot(tree) })
 
-const simulationDone = (options: Options, startTime: number, iterationCount: number) =>
+const simulationShouldFinish = (options: Options, startTime: number, iterationCount: number) =>
   (options.maxIterations !== undefined && iterationCount >= options.maxIterations) ||
   (options.timeLimitMs !== undefined && Date.now() - startTime >= options.timeLimitMs)
 
-const performIterations = (tree: Tree, options: Options) => {
+const performIterations = (initialTree: Tree, options: Options) => {
   const startTime = Date.now()
   let iterationCount = 0
-  while (!simulationDone(options, startTime, iterationCount)) {
+  let tree = initialTree
+  while (!simulationShouldFinish(options, startTime, iterationCount)) {
     notify(tree)(NotificationType.iteration, getRoot(tree), Date.now() - startTime, iterationCount)
     iterationCount++
     const bestTreeResult = findBestNodeForRoot(tree)
@@ -293,15 +295,16 @@ const calcBestNode = (tree: Tree) => {
   return maxNumberBy(rootChildren, node => node.scores[tree.rootPlayerIndex])!
 }
 
-export const findBestNode = (tree: Tree, options: Options) => {
-  notify(tree)(NotificationType.started, getRoot(tree))
-  const result = performIterations(tree, options)
-
-  const bestNode = calcBestNode(result.tree)
-  notify(result.tree)(NotificationType.finished, bestNode, result.iterationCount, result.elapsedTimeMs)
+export const findBestNode = (initialTree: Tree, options: Options) => {
+  notify(initialTree)(NotificationType.started, getRoot(initialTree))
+  const { tree, iterationCount, elapsedTimeMs } = performIterations(initialTree, options)
+  const bestNode = calcBestNode(tree)
+  notify(tree)(NotificationType.finished, bestNode, iterationCount, elapsedTimeMs)
 
   return {
     bestNode,
-    ...result,
+    elapsedTimeMs,
+    iterationCount,
+    tree,
   }
 }
