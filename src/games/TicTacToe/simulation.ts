@@ -21,7 +21,7 @@ const gameLogic: MCTS.GameRules<TicTacToe.GameState, TicTacToe.Move> = {
 
 const config: MCTS.Config<TicTacToe.GameState, TicTacToe.Move> = {
   calcScores,
-  calcUcb: MCTS.defaultUcbFormula(),
+  calcUct: MCTS.defaultUctFormula(),
   gameRules: gameLogic,
 }
 

@@ -30,7 +30,7 @@ const gameRules: MCTS.GameRules<ThreeHoleGame.GameState, ThreeHoleGame.Move> = {
 
 const config: MCTS.Config<ThreeHoleGame.GameState, ThreeHoleGame.Move> = {
   calcScores,
-  calcUcb: MCTS.defaultUcbFormula(),
+  calcUct: MCTS.defaultUctFormula(),
   gameRules,
 }
 

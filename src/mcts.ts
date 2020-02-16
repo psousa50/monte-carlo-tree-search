@@ -1,5 +1,5 @@
 import * as R from "ramda"
-import { maxNumber, maxNumberBy } from "./utils/collections"
+import { maxNumberBy } from "./utils/collections"
 
 export const NO_PARENT = -1
 
@@ -40,7 +40,7 @@ export interface Notification {
 }
 
 export interface Config<S = State, M = Move> {
-  calcUcb: (tree: Tree) => (node: Node, playerIndex: number) => number
+  calcUct: (tree: Tree) => (node: Node, playerIndex: number) => number
   calcScores: (state: S) => number[]
   notifier?: (notification: Notification) => void
   gameRules: GameRules<S, M>
@@ -107,7 +107,7 @@ const parentVisits = (tree: Tree) => (node: Node) => {
 }
 
 const sqrt2 = Math.sqrt(2)
-export const defaultUcbFormula = (c: number = sqrt2) => (tree: Tree) => (node: Node, playerIndex: number) =>
+export const defaultUctFormula = (c: number = sqrt2) => (tree: Tree) => (node: Node, playerIndex: number) =>
   node.visits === 0
     ? Infinity
     : node.scores[playerIndex] / node.visits + c * Math.sqrt(Math.log(parentVisits(tree)(node)) / node.visits)
@@ -179,10 +179,10 @@ const selectBestNode = (tree: Tree) => (node: Node): Node => {
   const playerIndex = config.gameRules.currentPlayerIndex(node.state)
   const bestUcbNode = childNodes.reduce(
     (acc, childNode) => {
-      const ucb = config.calcUcb(tree)(childNode, playerIndex)
-      return ucb > acc.bestUcb ? { bestNode: childNode, bestUcb: ucb } : acc
+      const uctValue = config.calcUct(tree)(childNode, playerIndex)
+      return uctValue > acc.bestUcb ? { bestNode: childNode, bestUcb: uctValue } : acc
     },
-    { bestNode: firstNode, bestUcb: config.calcUcb(tree)(firstNode, playerIndex) },
+    { bestNode: firstNode, bestUcb: config.calcUct(tree)(firstNode, playerIndex) },
   )
 
   notify(tree)(NotificationType.nodeSelected, bestUcbNode.bestNode)
