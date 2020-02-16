@@ -17,7 +17,8 @@ const nextMove = (state: ThreeHoleGame.GameState) => {
   return moves.length > 0 ? moves[0] : undefined
 }
 
-export const logNotifications = (notification: MCTS.Notification) => console.log(`${notification.type}\n${JSON.stringify(notification)}`)
+export const logNotifications = (notification: MCTS.Notification) =>
+  console.log(`${notification.type}\n${JSON.stringify(notification)}`)
 
 const gameRules: MCTS.GameRules<ThreeHoleGame.GameState, ThreeHoleGame.Move> = {
   availableMoves: ThreeHoleGame.availableMoves,
@@ -59,7 +60,9 @@ describe("mcts", () => {
 
   it("on first rollout", () => {
     const game = ThreeHoleGame.create()
-    const { tree } = MCTS.findBestNode(MCTS.createTree(config)(game, 0), { maxIterations: 3 })
+    const { tree } = MCTS.findBestNode(MCTS.createTree(config)(game, 0), {
+      maxIterations: 3,
+    })
     const rootNodes = MCTS.getChildren(tree)(MCTS.getRoot(tree))
 
     expect(rootNodes.map(n => n.scores)).toEqual([
@@ -69,7 +72,7 @@ describe("mcts", () => {
     ])
   })
 
-  it("on next iteration should select 2nd child", () => {
+  it("on 4th iteration should select 2nd child", () => {
     const game = ThreeHoleGame.create()
     const { tree } = MCTS.findBestNode(MCTS.createTree(config)(game, 0), { maxIterations: 4 })
     const rootNodes = MCTS.getChildren(tree)(MCTS.getRoot(tree))
@@ -82,9 +85,11 @@ describe("mcts", () => {
     expect(rootNodes.map(n => n.visits)).toEqual([1, 2, 1])
   })
 
-  it("on next iteration should select and expand 3rd child", () => {
+  it("on 5th iteration should select and expand 3rd child", () => {
     const game = ThreeHoleGame.create()
-    const { tree } = MCTS.findBestNode(MCTS.createTree(config)(game, 0), { maxIterations: 5 })
+    const { tree } = MCTS.findBestNode(MCTS.createTree(config)(game, 0), {
+      maxIterations: 5,
+    })
     const rootNodes = MCTS.getChildren(tree)(MCTS.getRoot(tree))
 
     expect(rootNodes.map(n => n.scores)).toEqual([
