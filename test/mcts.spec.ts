@@ -57,18 +57,6 @@ describe("mcts", () => {
     expect(tree).toEqual(expectedTree)
   })
 
-  it("on start scores should be empty", () => {
-    const game = ThreeHoleGame.create()
-    const { tree } = MCTS.findBestNode(MCTS.createTree(config)(game, 0), { maxIterations: 0 })
-    const rootNodes = MCTS.getChildren(tree)(MCTS.getRoot(tree))
-
-    expect(rootNodes.map(n => n.scores)).toEqual([
-      [0, 0],
-      [0, 0],
-      [0, 0],
-    ])
-  })
-
   it("on first rollout", () => {
     const game = ThreeHoleGame.create()
     const { tree } = MCTS.findBestNode(MCTS.createTree(config)(game, 0), { maxIterations: 3 })
