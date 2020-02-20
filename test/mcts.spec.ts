@@ -41,9 +41,10 @@ describe("mcts", () => {
 
     const tree = MCTS.createTree(config)(game, 0)
 
-    const root = {
+    const rootNode = {
       children: [],
       index: 0,
+      level: 0,
       parentIndex: MCTS.NO_PARENT,
       scores: [0, 0],
       state: game,
@@ -51,7 +52,8 @@ describe("mcts", () => {
     }
     const expectedTree = {
       config,
-      nodes: [root],
+      maxDepth: 0,
+      nodes: [rootNode],
       rootPlayerIndex: 0,
     }
 
@@ -70,6 +72,8 @@ describe("mcts", () => {
       [1, -1],
       [1, -1],
     ])
+
+    expect(tree.maxDepth).toEqual(1)
   })
 
   it("on 4th iteration should select 2nd child", () => {
@@ -82,6 +86,7 @@ describe("mcts", () => {
       [2, -2],
       [1, -1],
     ])
+    expect(rootNodes.map(n => n.level)).toEqual([1, 1, 1])
     expect(rootNodes.map(n => n.visits)).toEqual([1, 2, 1])
   })
 
@@ -98,11 +103,14 @@ describe("mcts", () => {
       [2, -2],
     ])
     expect(rootNodes.map(n => n.visits)).toEqual([1, 2, 2])
-    expect(MCTS.getChildren(tree)(rootNodes[2]).map(n => n.scores)).toEqual([
+    const thirdChildChildren = MCTS.getChildren(tree)(rootNodes[2])
+    expect(thirdChildChildren.map(n => n.scores)).toEqual([
       [1, -1],
       [0, 0],
     ])
-    expect(MCTS.getChildren(tree)(rootNodes[2]).map(n => n.visits)).toEqual([1, 0])
+    expect(thirdChildChildren.map(n => n.visits)).toEqual([1, 0])
+    expect(thirdChildChildren.map(n => n.level)).toEqual([2, 2])
+    expect(tree.maxDepth).toEqual(2)
   })
 
   it("should select best node for current player", () => {

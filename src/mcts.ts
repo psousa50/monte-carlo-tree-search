@@ -8,6 +8,7 @@ type Move = any
 
 export interface Tree<S = State, M = Move> {
   config: Config<S, M>
+  maxDepth: number
   nodes: ReadonlyArray<Node>
   rootPlayerIndex: number
 }
@@ -15,6 +16,7 @@ export interface Tree<S = State, M = Move> {
 export interface Node {
   children: ReadonlyArray<number>
   index: number
+  level: number
   move?: Move
   parentIndex: number
   state: State
@@ -95,12 +97,14 @@ const notify = (tree: Tree) => (
 const createNode = (
   state: State,
   index: number,
+  level: number,
   playersCount: number,
   parentIndex: number = NO_PARENT,
   move: Move | undefined = undefined,
 ) => ({
   children: [],
   index,
+  level,
   move,
   parentIndex,
   scores: R.range(0, playersCount).map(_ => 0),
@@ -137,7 +141,8 @@ const replaceNode = (tree: Tree) => (nodeIndex: number, update: (node: Node) => 
 
 export const createTree = (config: Config) => (initialState: State, rootPlayerIndex: number): Tree => ({
   config,
-  nodes: [createNode(initialState, 0, config.gameRules.playersCount(initialState))],
+  maxDepth: 0,
+  nodes: [createNode(initialState, 0, 0, config.gameRules.playersCount(initialState))],
   rootPlayerIndex,
 })
 
@@ -181,6 +186,7 @@ const expand = ({ tree, node }: TreeNode) => {
     createNode(
       gameRules.nextState(node.state, move),
       nodeIndex + i,
+      node.level + 1,
       gameRules.playersCount(node.state),
       node.index,
       move,
@@ -195,6 +201,7 @@ const expand = ({ tree, node }: TreeNode) => {
     node: nodeWithChildren,
     tree: {
       ...tree,
+      maxDepth: Math.max(tree.maxDepth, node.level + 1),
       nodes: [...tree.nodes.map(n => (n.index === node.index ? nodeWithChildren : n)), ...children],
     },
   }
