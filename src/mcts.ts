@@ -245,11 +245,8 @@ const updateNodeStats = (scores: number[]) => (node: Node) => ({
   visits: node.visits + 1,
 })
 
-const updateTreeNodeStats = (tree: Tree, node: Node, scores: number[]) => ({
-  node,
-  scores,
-  tree: replaceNode(tree)(node.index, updateNodeStats(scores)),
-})
+const updateTreeNodeStats = (tree: Tree, node: Node, scores: number[]) =>
+  replaceNode(tree)(node.index, updateNodeStats(scores))
 
 const runIteration = (initialNode: TreeNode): TreeResult => {
   const gameRules = initialNode.tree.config.gameRules
@@ -261,11 +258,16 @@ const runIteration = (initialNode: TreeNode): TreeResult => {
     ? rollout(bestNode)
     : runIteration(bestNode)
 
-  const updatedResult = updateTreeNodeStats(treeResult.tree, bestNode.node, treeResult.scores)
+  const updatedTree = replaceNode(treeResult.tree)(bestNode.node.index, updateNodeStats(treeResult.scores))
+  const updatedNode = getNode(updatedTree)(bestNode.node.index)
 
-  notify(updatedResult.tree)(NotificationType.calculatedScore, updatedResult.node)
+  notify(updatedTree)(NotificationType.calculatedScore, updatedNode)
 
-  return updatedResult
+  return {
+    node: updatedNode,
+    scores: treeResult.scores,
+    tree: updatedTree,
+  }
 }
 
 const runIterationForRoot = (tree: Tree) => runIteration({ tree, node: getRoot(tree) })
@@ -281,12 +283,8 @@ const runIterations = (initialTree: Tree, options: Options) => {
   while (!simulationShouldFinish(options, startTime, iterationCount)) {
     notify(currentTree)(NotificationType.iteration, getRoot(currentTree), Date.now() - startTime, iterationCount)
     iterationCount++
-    const {tree, scores} = runIterationForRoot(currentTree)
-    currentTree = updateTreeNodeStats(
-      tree,
-      getRoot(tree),
-      scores,
-    ).tree
+    const { tree, scores } = runIterationForRoot(currentTree)
+    currentTree = updateTreeNodeStats(tree, getRoot(tree), scores)
   }
 
   return {
