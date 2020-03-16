@@ -220,7 +220,9 @@ const rolloutValue = (tree: Tree) => (state: State): number[] => {
   const gameRules = tree.config.gameRules
 
   const nextMove = gameRules.nextMove ? gameRules.nextMove(state) : nextRandomMove(tree)(state)
-  return nextMove ? rolloutValue(tree)(gameRules.nextState(state, nextMove)) : tree.config.calcScores(state)
+  return nextMove && !gameRules.isFinal(state)
+    ? rolloutValue(tree)(gameRules.nextState(state, nextMove))
+    : tree.config.calcScores(state)
 }
 
 const rollout = ({ tree, node }: TreeNode): TreeResult => {
