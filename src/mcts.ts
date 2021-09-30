@@ -298,7 +298,10 @@ const runIterations = (initialTree: Tree, options: Options) => {
 
 const calcBestNode = (tree: Tree) => {
   const rootChildren = getChildren(tree)(getRoot(tree))
-  return maxNumberBy(rootChildren, node => node.scores[tree.rootPlayerIndex] / node.visits)!
+  return maxNumberBy(
+    rootChildren,
+    node => node.scores.reduce((sum, s, i) => sum + (i === tree.rootPlayerIndex ? +1 : -1) * s, 0) / node.visits,
+  )!
 }
 
 export const findBestNode = (initialTree: Tree, options: Options) => {
