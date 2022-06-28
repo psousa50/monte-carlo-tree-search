@@ -1,32 +1,38 @@
-// import * as MCTS from "../../mcts"
-// import * as TicTacToe from "./TicTacToe"
+import * as MCTS from "../../mcts"
+import * as C4 from "./game"
 
-// const calcNodeValue = (state: TicTacToe.GameState) =>
-//   TicTacToe.playerWins(state.board, "X") ? 1 : TicTacToe.playerWins(state.board, "O") ? -1 : undefined
+const playerPiece = (playerIndex: number) => (playerIndex === 0 ? "X" : "O")
 
-// const strategy: MCTS.Strategy<TicTacToe.GameState, TicTacToe.Move> = {
-//   availableMoves: TicTacToe.availableMoves,
-//   calcValue: calcNodeValue,
-//   isFinal: TicTacToe.isFinal,
-//   nextMove: TicTacToe.nextMove,
-//   nextState: TicTacToe.move,
-// }
+const calcScore = (state: C4.GameState, playerIndex: number) =>
+  state.board[4] === playerPiece(playerIndex) ? 1 : state.board[4] === playerPiece(1 - playerIndex) ? -1 : 0
 
-// const config: MCTS.Config<TicTacToe.GameState, TicTacToe.Move> = {
-//   calcUcb: MCTS.defaultUcbFormula(),
-//   strategy,
-// }
+const calcScores = (state: C4.GameState) => [calcScore(state, 0), calcScore(state, 1)]
 
-// const run = () => {
+const currentPlayerIndex = (state: C4.GameState) => (state.player === "X" ? 0 : 1)
 
-//   const game = TicTacToe.create()
+const gameLogic: MCTS.GameRules<C4.GameState, C4.Move> = {
+  availableMoves: C4.availableMoves,
+  currentPlayerIndex,
+  isFinal: C4.isFinal,
+  nextMove: C4.nextMove,
+  nextState: C4.move,
+  playersCount: () => 2,
+}
 
-//   const { tree } = MCTS.findBestNode(MCTS.createTree(config)(game, {}), 60)
+const config: MCTS.Config<C4.GameState, C4.Move> = {
+  calcScores,
+  calcUct: MCTS.defaultUctFormula(),
+  gameRules: gameLogic,
+}
 
-//   const rootNodes = MCTS.getChildren(tree)(MCTS.getRoot(tree))
+const run = () => {
+  const game = C4.create()
 
-//   console.log("=====>\n", rootNodes)
+  const { tree } = MCTS.findBestNode(MCTS.createTree(config)(game, 0), { timeLimitMs: 5000 })
 
-// }
+  const rootNodes = MCTS.getChildren(tree)(MCTS.getRoot(tree))
 
-// run()
+  console.log("=====>\n", rootNodes)
+}
+
+run()

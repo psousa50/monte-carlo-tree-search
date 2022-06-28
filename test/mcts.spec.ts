@@ -1,6 +1,4 @@
-import { not } from "ramda"
 import * as ThreeHoleGame from "../src/games/ThreeHoleGame/game"
-import { playerWins } from "../src/games/TicTacToe/game"
 import * as MCTS from "../src/mcts"
 
 const playerPiece = (playerIndex: number) => (playerIndex === 0 ? "X" : "O")
@@ -67,7 +65,7 @@ describe("mcts", () => {
     })
     const rootNodes = MCTS.getChildren(tree)(MCTS.getRoot(tree))
 
-    expect(rootNodes.map(n => n.scores)).toEqual([
+    expect(rootNodes.map((n) => n.scores)).toEqual([
       [-1, 1],
       [1, -1],
       [1, -1],
@@ -81,13 +79,13 @@ describe("mcts", () => {
     const { tree } = MCTS.findBestNode(MCTS.createTree(config)(game, 0), { maxIterations: 4 })
     const rootNodes = MCTS.getChildren(tree)(MCTS.getRoot(tree))
 
-    expect(rootNodes.map(n => n.scores)).toEqual([
+    expect(rootNodes.map((n) => n.scores)).toEqual([
       [-1, 1],
       [2, -2],
       [1, -1],
     ])
-    expect(rootNodes.map(n => n.level)).toEqual([1, 1, 1])
-    expect(rootNodes.map(n => n.visits)).toEqual([1, 2, 1])
+    expect(rootNodes.map((n) => n.level)).toEqual([1, 1, 1])
+    expect(rootNodes.map((n) => n.visits)).toEqual([1, 2, 1])
   })
 
   it("on 5th iteration should select and expand 3rd child", () => {
@@ -97,19 +95,19 @@ describe("mcts", () => {
     })
     const rootNodes = MCTS.getChildren(tree)(MCTS.getRoot(tree))
 
-    expect(rootNodes.map(n => n.scores)).toEqual([
+    expect(rootNodes.map((n) => n.scores)).toEqual([
       [-1, 1],
       [2, -2],
       [2, -2],
     ])
-    expect(rootNodes.map(n => n.visits)).toEqual([1, 2, 2])
+    expect(rootNodes.map((n) => n.visits)).toEqual([1, 2, 2])
     const thirdChildChildren = MCTS.getChildren(tree)(rootNodes[2])
-    expect(thirdChildChildren.map(n => n.scores)).toEqual([
+    expect(thirdChildChildren.map((n) => n.scores)).toEqual([
       [1, -1],
       [0, 0],
     ])
-    expect(thirdChildChildren.map(n => n.visits)).toEqual([1, 0])
-    expect(thirdChildChildren.map(n => n.level)).toEqual([2, 2])
+    expect(thirdChildChildren.map((n) => n.visits)).toEqual([1, 0])
+    expect(thirdChildChildren.map((n) => n.level)).toEqual([2, 2])
     expect(tree.maxDepth).toEqual(2)
   })
 
@@ -123,7 +121,7 @@ describe("mcts", () => {
     const { tree: tree2 } = MCTS.findBestNode(MCTS.createTree(config)(game, 0), { maxIterations: 17 })
     const rootNodes2 = MCTS.getChildren(tree2)(MCTS.getRoot(tree2))
 
-    expect(MCTS.getChildren(tree1)(rootNodes1[2]).map(n => n.visits)).toEqual([1, 1])
-    expect(MCTS.getChildren(tree2)(rootNodes2[2]).map(n => n.visits)).toEqual([1, 2])
+    expect(MCTS.getChildren(tree1)(rootNodes1[2]).map((n) => n.visits)).toEqual([1, 1])
+    expect(MCTS.getChildren(tree2)(rootNodes2[2]).map((n) => n.visits)).toEqual([1, 2])
   })
 })
